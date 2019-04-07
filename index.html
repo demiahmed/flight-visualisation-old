@@ -1,0 +1,59 @@
+﻿<html>
+	<head>
+		<title>Flight visualisation</title>
+        <meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body { margin: 0; overflow: hidden; }
+			canvas { width: 100%; height: 100%; }
+		</style>
+	</head>
+	<body>
+		<script type="x-shader/x-vertex" id="trail_vertex_shader">
+			// This is our vertex x-shader
+			
+			//Pass in attributes
+			attribute float positionInTrail;
+			
+			// Pass in uniforms
+			uniform float numberOfTrailPoints;
+
+			// Decalre varyings
+			varying float vdraw;
+
+			// switch on high precision floats
+			#ifdef GL_ES
+			precision highp float;
+			#endif
+			
+			void main() 
+			{
+				gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+				vdraw = positionInTrail;
+			}
+		</script>
+		<script type="x-shader/x-fragment" id="trail_fragment_shader">
+			// This is our fragement x-shader
+
+			#ifdef GL_ES
+			precision highp float;
+			#endif
+
+			varying float vdraw;
+
+			void main()
+			{
+				gl_FragColor = vec4(0.57, 0.78, 1, vdraw);
+			}
+		</script>
+		<script src="libraries/stats.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/102/three.min.js"></script>
+		<script src="libraries/cartesian-spherical-polar.js"></script>
+		<script src="libraries/OrbitControls.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="libraries/everpolate.browserified.min.js"></script>	
+		<script src="libraries/numeric.js"></script>
+		<script src="libraries/GPUParticleSystem.js"></script>
+        <script src="main2.js"></script>
+	</body>
+</html>
