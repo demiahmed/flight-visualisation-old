@@ -85,7 +85,7 @@ function createPoints(flight_ID)
     var sprite = textureLoader.load("textures/particle.png");
     var material = new THREE.PointsMaterial( { size: 0.5, map: sprite, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true} );
     var particle = new THREE.Points(geometry, material);
-
+    particle.frustumCulled = false;
     // store in flights object
     return(particle);
 }
@@ -106,6 +106,7 @@ function initTrail(flight_ID, curve)
 
     // Create the final object which can be added to the scene
     var curveObject = new THREE.Line(geometry, trailMaterial);
+    curveObject.frustumCulled = false;
     return(curveObject);
 }
 
@@ -186,14 +187,14 @@ function createCurveLookups(flight_ID)
 // Function to map altitude in ft to desired radius
 function altitudeToRadius(altitudeInFT)
 {
-    return(altitudeInFT/10000 + GLOBE_RADIUS);
+    return(altitudeInFT/30000 + GLOBE_RADIUS);
 }
 
 function initialiseScene()
 {
     // Set up scene and camera
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.01, 1000 );
+    camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.001, 1000 );
     camera.position.set(GLOBE_RADIUS, GLOBE_RADIUS, GLOBE_RADIUS);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
 
@@ -264,6 +265,7 @@ function animatePoints()
             // add to scene if necessary
             if (! scene.getObjectById(flights[flight_ID].particle.id))
             {
+                console.log("removing point");
                 scene.add(flights[flight_ID].particle);
             }
         }
@@ -287,7 +289,7 @@ function showTrails()
         // check if it should even be displayed
         if (timekeeping.currentTime >= flights[flight_ID].lifetime.start && timekeeping.currentTime <= flights[flight_ID].lifetime.stop + TRAIL_LENGTH)
         {
-            // Trail should be displayed. 
+            // Trail should be displayed
             updateTrailVertecies(flight_ID);
 
             // Add to scene if necessary
