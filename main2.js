@@ -11,6 +11,8 @@ var scene, camera, renderer, controls, stats, position_data, flights, timekeepin
 // Start main script once data has been loaded
 $.get('location_data.json',function(data) 
 {
+    console.log("loaded");
+    //"9999999999": {"1553428175": {"altitude": 50000, "latitude": 20.68, "longitude": -76.29}, "1553429175": {"altitude": 50000, "latitude": 51.49, "longitude": -1.80}, "1553430175": {"altitude": 50000, "latitude": 51.65, "longitude": -0.884}}
     // Load needed data into the createFlights object which stores all information about plane movement and any THREE objects
     position_data = data;
     createFlights(data);
@@ -31,7 +33,7 @@ function createFlights()
     // Create flights object that will be populated
     flights = {};
 
-    // initalise our custom shader material
+    // initalise our custom shader material which renders trails
     initTrailMaterial();
 
     // Loop over each flight
@@ -129,7 +131,6 @@ function initTimekeeping()
             lastTime = flights[flight_ID].lifetime.stop
         }
     });
-    console.log("First flight " + flight);
     // store in object
     timekeeping = {first: firstTime, last:lastTime, currentTime: firstTime};
     //timekeeping = {first: firstTime, last:lastTime, currentTime: 1553439935};
@@ -138,25 +139,25 @@ function initTimekeeping()
 // Fucntion to create catmaull rom curve from given flight ID
 function getCurve(flight_ID)
 {
-    // Create ordered array of known position times of the flight
-    var times = Object.keys(position_data[flight_ID]);
-    times = times.sort();
+// Create ordered array of known position times of the flight
+var times = Object.keys(position_data[flight_ID]);
+times = times.sort();
 
-    // Loop over each time of the flight
-    var curvePoints = [];
-    times.forEach(function(time) 
-    {
-        // We need to supply an array of Vector3 to the catmull rom constructor. 
-        // The polarToCartestian function returns a vector3 given lat, long, alt
-        curvePoints.push(polarToCartesian(position_data[flight_ID][time].latitude,
-                                            position_data[flight_ID][time].longitude,
-                                            altitudeToRadius(position_data[flight_ID][time].altitude)));
+// Loop over each time of the flight
+var curvePoints = [];
+times.forEach(function(time) 
+{
+    // We need to supply an array of Vector3 to the catmull rom constructor. 
+    // The polarToCartestian function returns a vector3 given lat, long, alt
+    curvePoints.push(polarToCartesian(position_data[flight_ID][time].latitude,
+                                        position_data[flight_ID][time].longitude,
+                                        altitudeToRadius(position_data[flight_ID][time].altitude)));
 
-    });
+});
 
-    // Use list of curve points to create catmul rom curve and return
-    var curve = new THREE.CatmullRomCurve3(curvePoints);
-    return(curve);
+// Use list of curve points to create catmul rom curve and return
+var curve = new THREE.CatmullRomCurve3(curvePoints);
+return(curve);
 }
 
 // Function to create a dict of lifetime start and stop times from a given flight ID
@@ -265,7 +266,6 @@ function animatePoints()
             // add to scene if necessary
             if (! scene.getObjectById(flights[flight_ID].particle.id))
             {
-                console.log("removing point");
                 scene.add(flights[flight_ID].particle);
             }
         }
@@ -348,7 +348,7 @@ function animate()
     
     animatePoints();
     showTrails();
-    timekeeping.currentTime = timekeeping.currentTime + 15;
+    timekeeping.currentTime = timekeeping.currentTime + 30;
 
     renderer.render(scene, camera);
     stats.end();
