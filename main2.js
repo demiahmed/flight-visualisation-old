@@ -139,25 +139,25 @@ function initTimekeeping()
 // Fucntion to create catmaull rom curve from given flight ID
 function getCurve(flight_ID)
 {
-// Create ordered array of known position times of the flight
-var times = Object.keys(position_data[flight_ID]);
-times = times.sort();
+    // Create ordered array of known position times of the flight
+    var times = Object.keys(position_data[flight_ID]);
+    times = times.sort();
 
-// Loop over each time of the flight
-var curvePoints = [];
-times.forEach(function(time) 
-{
-    // We need to supply an array of Vector3 to the catmull rom constructor. 
-    // The polarToCartestian function returns a vector3 given lat, long, alt
-    curvePoints.push(polarToCartesian(position_data[flight_ID][time].latitude,
-                                        position_data[flight_ID][time].longitude,
-                                        altitudeToRadius(position_data[flight_ID][time].altitude)));
+    // Loop over each time of the flight
+    var curvePoints = [];
+    times.forEach(function(time) 
+    {
+        // We need to supply an array of Vector3 to the catmull rom constructor. 
+        // The polarToCartestian function returns a vector3 given lat, long, alt
+        curvePoints.push(polarToCartesian(position_data[flight_ID][time].latitude,
+                                            position_data[flight_ID][time].longitude,
+                                            altitudeToRadius(position_data[flight_ID][time].altitude)));
 
-});
+    });
 
-// Use list of curve points to create catmul rom curve and return
-var curve = new THREE.CatmullRomCurve3(curvePoints);
-return(curve);
+    // Use list of curve points to create catmul rom curve and return
+    var curve = new THREE.CatmullRomCurve3(curvePoints);
+    return(curve);
 }
 
 // Function to create a dict of lifetime start and stop times from a given flight ID
@@ -177,6 +177,7 @@ function createCurveLookups(flight_ID)
     
     // Use position times as our t variabale
     var flightTimes = Object.keys(position_data[flight_ID]).map(Number);
+    flightTimes = flightTimes.sort();
 
     // u values are simply equually spaced out points where number of points = number of points used to create curve
     var y = numeric.linspace(0,1,flightTimes.length);
@@ -348,7 +349,7 @@ function animate()
     
     animatePoints();
     showTrails();
-    timekeeping.currentTime = timekeeping.currentTime + 30;
+    timekeeping.currentTime = timekeeping.currentTime + 15;
 
     renderer.render(scene, camera);
     stats.end();
