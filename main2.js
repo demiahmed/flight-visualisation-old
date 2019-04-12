@@ -14,7 +14,7 @@ $.get('location_data.json',function(data)
     console.log("loaded");
     //"9999999999": {"1553428175": {"altitude": 50000, "latitude": 20.68, "longitude": -76.29}, "1553429175": {"altitude": 50000, "latitude": 51.49, "longitude": -1.80}, "1553430175": {"altitude": 50000, "latitude": 51.65, "longitude": -0.884}}
     // Load needed data into the createFlights object which stores all information about plane movement and any THREE objects
-    position_data = data;
+    position_data = interpolatePoints(data);
     createFlights(data);
     initTimekeeping();
 
@@ -26,6 +26,57 @@ $.get('location_data.json',function(data)
     animate();
 
 });
+
+function interpolatePoints(position_data)
+{
+    // Loop over list of flight_IDs
+    var flight_IDs = Object.keys(position_data);
+    for(var i = 0; i < flight_IDs.length; i++)
+    {
+        var flight_ID = flight_IDs[i];
+
+        // Get list of known timestamps
+        var times = Object.keys(position_data[flight_ID]);
+        
+        // Loop over known timestamps
+        for(var j = 0; j < times.length - 1; j++)
+        {
+            //var thisPoint = position_data[flight_ID][times[j]];
+            var thisPoint = jQuery.extend(true, {}, position_data[flight_ID][times[j]]);
+            thisPoint["time"] = parseInt(times[j]);
+            var nextPoint = position_data[flight_ID][times[j + 1]];
+
+            // Calculate distance between this and next known point
+            var distance = distanceBetween(thisPoint.latitude, thisPoint.longitude, nextPoint.latitude, nextPoint.longitude);
+            
+            while(distance > 800000)
+            {
+                console.log(flight_ID);
+                // Add points every 400km
+                var fraction = 400000 / distance;
+                
+                // Get interpolated position
+                var interpolatedPosition = intermediatePoint(thisPoint.latitude, thisPoint.longitude, nextPoint.latitude, nextPoint.longitude, fraction);
+                console.log(thisPoint);
+                // Get interpolated altitude
+                var interpolatedAltitude = everpolate.linear(fraction, [0, 1], [thisPoint.altitude, nextPoint.altitude])[0];
+
+                // Get interpolated time
+                var interpolatedTime = everpolate.linear(fraction, [0, 1], [thisPoint.time, times[j + 1]])[0];
+
+                thisPoint = {"latitude":interpolatedPosition[0], "longitude":interpolatedPosition[1], "altitude":interpolatedAltitude, "time":interpolatedTime};
+                
+                //Add this point to position_data
+                position_data[flight_ID][thisPoint.time] = {"latitude": thisPoint.latitude, "longitude": thisPoint.longitude, "altitude": thisPoint.altitude};
+
+                // update distance between this and next point
+                distance = distanceBetween(thisPoint.latitude, thisPoint.longitude, nextPoint.latitude, nextPoint.longitude);
+            }
+        }
+    }
+
+    return(position_data);
+}
 
 // Fucntion to create the main data object
 function createFlights()
