@@ -2,19 +2,22 @@
 
 // Declare constants
 const GLOBE_RADIUS = 100;
-const TRAIL_LENGTH = 1200;    //Trail length in seconds
+const TRAIL_LENGTH = 1200;
 const TRAIL_POINTS = 20;
 
 // Declare global variables
-var scene, camera, renderer, controls, stats, position_data, flights, timekeeping, trailMaterial;
+var scene, camera, renderer, controls, stats, position_data, flights, timekeeping; // trailMaterial;;
 
 // Start main script once data has been loaded
 $.get('location_data.json',function(data) 
 {
-    console.log("loaded");
-    //"9999999999": {"1553428175": {"altitude": 50000, "latitude": 20.68, "longitude": -76.29}, "1553429175": {"altitude": 50000, "latitude": 51.49, "longitude": -1.80}, "1553430175": {"altitude": 50000, "latitude": 51.65, "longitude": -0.884}}
     // Load needed data into the createFlights object which stores all information about plane movement and any THREE objects
+    // Interpolate some of the points to prevent points moving through the globe
     position_data = interpolatePoints(data);
+    
+    // initalise our custom shader material which renders trails
+    //initTrailMaterial();
+    
     createFlights(data);
     initTimekeeping();
 
@@ -51,13 +54,12 @@ function interpolatePoints(position_data)
             
             while(distance > 800000)
             {
-                console.log(flight_ID);
                 // Add points every 400km
                 var fraction = 400000 / distance;
                 
                 // Get interpolated position
                 var interpolatedPosition = intermediatePoint(thisPoint.latitude, thisPoint.longitude, nextPoint.latitude, nextPoint.longitude, fraction);
-                console.log(thisPoint);
+
                 // Get interpolated altitude
                 var interpolatedAltitude = everpolate.linear(fraction, [0, 1], [thisPoint.altitude, nextPoint.altitude])[0];
 
@@ -84,9 +86,6 @@ function createFlights()
     // Create flights object that will be populated
     flights = {};
 
-    // initalise our custom shader material which renders trails
-    initTrailMaterial();
-
     // Loop over each flight
     Object.keys(position_data).forEach(function(flight_ID)
     {
@@ -108,11 +107,18 @@ function createFlights()
         // store data in dictionary
         flights[flight_ID] = {lifetime : lifetimes, particle : particle, curve : curve, curveLookupX:curveLookups.x, curveLookupY: curveLookups.y, trail: trail};
 
-        // create function to map time to point on curve
+        // create function to map time in seconds to point in space
         flights[flight_ID].location = function(time)
         {
-            var u = everpolate.linear(time, this.curveLookupX, this.curveLookupY);
-            return(this.curve.getPoint(u));
+            var t = everpolate.linear(time, this.curveLookupX, this.curveLookupY);
+            return(this.curve.getPoint(t));
+        } 
+
+        // create function to map time in seconds to point on curve
+        flights[flight_ID].t = function(time)
+        {
+            var t = everpolate.linear(time, this.curveLookupX, this.curveLookupY);
+            return(t);
         } 
     });
 }
@@ -121,7 +127,7 @@ function createFlights()
 function initTrailMaterial()
 {
     trailMaterial = new THREE.ShaderMaterial({
-        uniforms        : {numberOfTrailPoints: {value: TRAIL_POINTS}},
+        uniforms        : {currentPositionCoordinates: {value: new THREE.Vector3(0, 0 , 0)}},
         vertexShader    : document.getElementById( 'trail_vertex_shader' ).textContent,
         fragmentShader  : document.getElementById( 'trail_fragment_shader' ).textContent,
         transparent     : true
@@ -149,17 +155,21 @@ function initTrail(flight_ID, curve)
     var points = curve.getPoints(TRAIL_POINTS - 1);
     var geometry = new THREE.BufferGeometry().setFromPoints(points);
     
-    // Create an attribute for each vertex which is the point's relative position with repect to the total
-    //length of the trail and add as vertex attribute
-    var positionInTrail = new Float32Array( numeric.linspace(1,0,TRAIL_POINTS) );
-    geometry.addAttribute('positionInTrail', new THREE.BufferAttribute(positionInTrail, 1));
+    // Create an attribute for each vertex which is the vertex's location in the trail from 1 to 0.
+    var relativePosition = new Float32Array( numeric.linspace(0,0,TRAIL_POINTS) );
+    geometry.addAttribute('relativePosition', new THREE.BufferAttribute(relativePosition, 1));
+    geometry.attributes.relativePosition.dynamic = true;                            // Tell the GPU that this attribute will change often
 
-    // Tell the GPU that these verticies will be updated often
-    geometry.attributes.position.dynamic = true;
+    var material = new THREE.ShaderMaterial({
+    uniforms        : {currentPositionCoordinates: {value: new Float32Array([0, 0 , 0])}},
+    vertexShader    : document.getElementById( 'trail_vertex_shader' ).textContent,
+    fragmentShader  : document.getElementById( 'trail_fragment_shader' ).textContent,
+    transparent     : true
+});
+
 
     // Create the final object which can be added to the scene
-    var curveObject = new THREE.Line(geometry, trailMaterial);
-    curveObject.frustumCulled = false;
+    var curveObject = new THREE.Line(geometry, material);
     return(curveObject);
 }
 
@@ -187,7 +197,7 @@ function initTimekeeping()
     //timekeeping = {first: firstTime, last:lastTime, currentTime: 1553439935};
 }
 
-// Fucntion to create catmaull rom curve from given flight ID
+// Function to create catmaull rom curve from given flight ID
 function getCurve(flight_ID)
 {
     // Create ordered array of known position times of the flight
@@ -341,9 +351,7 @@ function showTrails()
         // check if it should even be displayed
         if (timekeeping.currentTime >= flights[flight_ID].lifetime.start && timekeeping.currentTime <= flights[flight_ID].lifetime.stop + TRAIL_LENGTH)
         {
-            // Trail should be displayed
-            updateTrailVertecies(flight_ID);
-
+            setTrailDraw(flight_ID);
             // Add to scene if necessary
             if (! scene.getObjectById(flights[flight_ID].trail.id))
             {
@@ -361,34 +369,63 @@ function showTrails()
     });
 }
 
-// Function to update the vertex positions of our trail line for a given flight
-function updateTrailVertecies(flight_ID)
-{
-    // Loop through each point that we want in our trail
-    for(var i = 0; i < TRAIL_POINTS; i++)
+// function to setup anything we need to draw the trail properly
+function setTrailDraw(flight_ID)
+{    
+    // Set vertex attribute relativePosition to tell GPU where the vertex is positioned in the trail, where 1 is 
+    // the start of the trail, and 0 the end, with values inbetween being linearly intepolated
+    var trailStartVertexIndex = Math.ceil(flights[flight_ID].t(timekeeping.currentTime) * (TRAIL_POINTS - 1));
+    var trailEndVertexIndex = Math.ceil(flights[flight_ID].t(timekeeping.currentTime - TRAIL_LENGTH) * (TRAIL_POINTS - 1));
+    var numberOfVertexes = trailStartVertexIndex - trailEndVertexIndex + 1;
+    var positions = numeric.linspace(0,1,numberOfVertexes);
+
+    if(flight_ID)
+    // Assign the positions to the attribute array
+    flights[flight_ID].trail.geometry.attributes.relativePosition.array.fill(0);
+    for(var i = 0; i < positions.length; i++)
     {
-        // Calculate the location of this point
-        var t = timekeeping.currentTime - ((i/(TRAIL_POINTS - 1)) * TRAIL_LENGTH);
-
-        // Clamp values between takeoff and landing times
-        if (t < flights[flight_ID].lifetime.start)
-        {
-            t = flights[flight_ID].lifetime.start;
-        }
-        else if (t > flights[flight_ID].lifetime.stop)
-        {
-            t = flights[flight_ID].lifetime.stop;
-        }
-
-        var location = flights[flight_ID].location(t);
-
-        // Update the buffer geometry vertex positions with this point 
-        flights[flight_ID].trail.geometry.attributes.position.array[3*i] = location.x;
-        flights[flight_ID].trail.geometry.attributes.position.array[3*i + 1] = location.y;
-        flights[flight_ID].trail.geometry.attributes.position.array[3*i + 2] = location.z;    
+        flights[flight_ID].trail.geometry.attributes.relativePosition.array[trailEndVertexIndex + i] = positions[i];
     }
-    // Tell geometry it needs to update on next render
-    flights[flight_ID].trail.geometry.attributes.position.needsUpdate = true;
+    flights[flight_ID].trail.geometry.attributes.relativePosition.needsUpdate = true;
+    
+    // Tell the GPU where the plane currently is
+    flights[flight_ID].trail.material.uniforms.currentPositionCoordinates.value = flights[flight_ID].particle.geometry.attributes.position.array;
+    
+    
+    flights[flight_ID].trail.geometry.setDrawRange(0, trailStartVertexIndex);
+    
+    
+    /* // Find start and end t
+    var start = flights[flight_ID].t(timekeeping.currentTime);
+    var end = flights[flight_ID].t(timekeeping.currentTime - TRAIL_LENGTH);
+    if (end < 0)
+    {
+        end = 0;
+    }
+
+    var startVertexIndex = Math.ceil(start * (TRAIL_POINTS - 1));
+    var endVertexIndex = Math.floor(end * TRAIL_POINTS);
+
+    // Set vertex attributes to tell GPU how vertexes correspond to position in trail
+    flights[flight_ID].trail.geometry.attributes.relativePosition.array.fill(0);
+    var relativePositions = numeric.linspace(1,0,startVertexIndex - endVertexIndex);
+    for(var i = startVertexIndex; i > endVertexIndex; i--)
+    {
+        var relativePosition = relativePositions[startVertexIndex - i];
+        flights[flight_ID].trail.geometry.attributes.relativePosition.array[i] = relativePosition;
+    }
+    flights[flight_ID].trail.geometry.attributes.relativePosition.needsUpdate = true;
+
+    
+    
+    
+    // Tell the GPU where the plane currently is
+    flights[flight_ID].trail.material.uniforms.currentPositionCoordinates.value = flights[flight_ID].particle.geometry.attributes.position.array;
+    
+    
+    
+
+    //flights[flight_ID].trail.geometry.setDrawRange(endVertexIndex, startVertexIndex - endVertexIndex); */
 }
 
 function animate()

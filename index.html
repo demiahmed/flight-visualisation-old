@@ -10,40 +10,37 @@
 	</head>
 	<body>
 		<script type="x-shader/x-vertex" id="trail_vertex_shader">
-			// This is our vertex x-shader
-			
-			//Pass in attributes
-			attribute float positionInTrail;
+			// This is our vertex shader
 			
 			// Pass in uniforms
-			uniform float numberOfTrailPoints;
+			uniform vec3 currentPositionCoordinates;
 
-			// Decalre varyings
+			//Pass in attributes
+			attribute float relativePosition;
+
 			varying float vdraw;
 
-			// switch on high precision floats
-			#ifdef GL_ES
-			precision highp float;
-			#endif
-			
 			void main() 
 			{
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-				vdraw = positionInTrail;
+				
+				if(relativePosition > 0.9)		
+				{
+					// Move start to the trail to the plane's current location
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(currentPositionCoordinates, 1.0);
+				}
+				else
+				{
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				}
 			}
 		</script>
 		<script type="x-shader/x-fragment" id="trail_fragment_shader">
-			// This is our fragement x-shader
-
-			#ifdef GL_ES
-			precision highp float;
-			#endif
+			// This is our fragement shader
 
 			varying float vdraw;
-
 			void main()
 			{
-				gl_FragColor = vec4(0.57, 0.78, 1, vdraw);
+				gl_FragColor = vec4(1, 0, 1, 1);
 			}
 		</script>
 		<script src="libraries/stats.min.js"></script>
