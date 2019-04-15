@@ -23,24 +23,29 @@
 			void main() 
 			{
 				
-				if(relativePosition > 0.9)		
+				if(relativePosition == 1.0)		
 				{
 					// Move start to the trail to the plane's current location
-					gl_Position = projectionMatrix * modelViewMatrix * vec4(currentPositionCoordinates, 1.0);
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(currentPositionCoordinates, 1);
 				}
 				else
 				{
-					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1);
 				}
+
+				//Pass the vertex alpha (which in this case is our relative position in the trail) to the frag shader
+				vdraw = relativePosition;
 			}
 		</script>
 		<script type="x-shader/x-fragment" id="trail_fragment_shader">
 			// This is our fragement shader
 
+			// Pass in relative position from the vertex shader
 			varying float vdraw;
+			
 			void main()
 			{
-				gl_FragColor = vec4(1, 0, 1, 1);
+				gl_FragColor = vec4(1, 0, 1, vdraw);
 			}
 		</script>
 		<script src="libraries/stats.min.js"></script>

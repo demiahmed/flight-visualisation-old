@@ -3,7 +3,7 @@
 // Declare constants
 const GLOBE_RADIUS = 100;
 const TRAIL_LENGTH = 1200;
-const TRAIL_POINTS = 20;
+const TRAIL_POINTS = 500;
 
 // Declare global variables
 var scene, camera, renderer, controls, stats, position_data, flights, timekeeping; // trailMaterial;;
@@ -375,25 +375,28 @@ function setTrailDraw(flight_ID)
     // Set vertex attribute relativePosition to tell GPU where the vertex is positioned in the trail, where 1 is 
     // the start of the trail, and 0 the end, with values inbetween being linearly intepolated
     var trailStartVertexIndex = Math.ceil(flights[flight_ID].t(timekeeping.currentTime) * (TRAIL_POINTS - 1));
-    var trailEndVertexIndex = Math.ceil(flights[flight_ID].t(timekeeping.currentTime - TRAIL_LENGTH) * (TRAIL_POINTS - 1));
+    var trailEndVertexIndex = Math.floor(flights[flight_ID].t(timekeeping.currentTime - TRAIL_LENGTH) * (TRAIL_POINTS - 1));
     var numberOfVertexes = trailStartVertexIndex - trailEndVertexIndex + 1;
-    var positions = numeric.linspace(0,1,numberOfVertexes);
+    var positions = numeric.linspace(1,0,numberOfVertexes);
 
-    if(flight_ID)
-    // Assign the positions to the attribute array
     flights[flight_ID].trail.geometry.attributes.relativePosition.array.fill(0);
-    for(var i = 0; i < positions.length; i++)
+    for(var i = trailStartVertexIndex; i >= trailEndVertexIndex; i--)
     {
-        flights[flight_ID].trail.geometry.attributes.relativePosition.array[trailEndVertexIndex + i] = positions[i];
+        flights[flight_ID].trail.geometry.attributes.relativePosition.array[i] = positions[trailStartVertexIndex - i];
     }
+    
     flights[flight_ID].trail.geometry.attributes.relativePosition.needsUpdate = true;
+    
+    // Assign the positions to the attribute array
+    
+    
+    
     
     // Tell the GPU where the plane currently is
     flights[flight_ID].trail.material.uniforms.currentPositionCoordinates.value = flights[flight_ID].particle.geometry.attributes.position.array;
     
     
-    flights[flight_ID].trail.geometry.setDrawRange(0, trailStartVertexIndex);
-    
+    flights[flight_ID].trail.geometry.setDrawRange(trailEndVertexIndex, numberOfVertexes);
     
     /* // Find start and end t
     var start = flights[flight_ID].t(timekeeping.currentTime);
